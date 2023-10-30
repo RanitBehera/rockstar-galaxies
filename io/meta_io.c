@@ -19,6 +19,7 @@
 #include "io_generic.h"
 #include "io_internal.h"
 #include "io_nchilada.h"
+#include "io_mpgadget.h"
 #include "io_tipsy.h"
 #include "meta_io.h"
 #include "../distance.h"
@@ -150,6 +151,9 @@ void read_particles(char *filename) {
     exit(1);
   }
 #endif
+  else if (!strncasecmp(FILE_FORMAT, "MPGADGET", 8)) {
+    load_particles_mpgadget(filename, &p, &num_p);
+  }
   else {
     fprintf(stderr, "[Error] Unknown filetype %s!\n", FILE_FORMAT);
     exit(1);
