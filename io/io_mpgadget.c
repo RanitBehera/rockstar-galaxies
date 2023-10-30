@@ -25,8 +25,9 @@
 
 #define MPGADGET_NTYPES 6
 #define MPGHPT MPGADGET_HALO_PARTICLE_TYPE
+#define FILE_NAME_MAX_LENGTH 6
 
-
+// joins to strings and returns the pointer to heap
 char* str_join_on_heap(char *str1,char *str2){
     int len1 = strlen(str1);
     int len2 = strlen(str2);
@@ -39,9 +40,6 @@ char* str_join_on_heap(char *str1,char *str2){
     return joined_string;       // rember to free heap memory
 }
 
-
-
-
 float mpgadget_read_snap_header(char *filename,float *massTable, int64_t *npart, int64_t *npart_init)
 {
     char *subdir="/Header/attr-v2";
@@ -51,7 +49,7 @@ float mpgadget_read_snap_header(char *filename,float *massTable, int64_t *npart,
     char header_line[200];  // Hard coded
 
     input = check_fopen(fullpath,"r");
-    while (fgets(header_line, 200, input)){  // fgets
+    while (fgets(header_line, 256, input)){  // fgets
         //SCALAR
         if(!strncmp(header_line,"BoxSize",7)){
             strtok(header_line,"[");
@@ -114,6 +112,75 @@ float mpgadget_read_snap_header(char *filename,float *massTable, int64_t *npart,
 }
 
 
+
+void mpgadget_read_data(char* filename,int part_type, char* field){
+    
+    char *particle_dir;
+    if (part_type==0){particle_dir="/0/";}
+    if (part_type==1){particle_dir="/1/";}  
+    if (part_type==2){particle_dir="/2/";}  
+    if (part_type==3){particle_dir="/3/";}  
+    if (part_type==4){particle_dir="/4/";}
+    if (part_type==5){particle_dir="/5/";}
+    char* subdir=str_join_on_heap(particle_dir,field);
+    char *fulldir = str_join_on_heap(filename,subdir);   free(subdir);
+    char *file = str_join_on_heap(fulldir,"header");
+
+    FILE* input;
+
+    char header_line[256];
+    char* DTYPE;
+    int NMEMB, NFILE;
+    char** datafile;
+    int* LPF;   //Length per file for number of particles in each file
+    int fn=0;   //file number for each line of file info in header
+
+    // Read Header
+    input = check_fopen(file,"r");
+    while (fgets(header_line, 256, input)){
+        if(!strncmp(header_line,"DTYPE",5)){
+            strtok(header_line,"<");
+            DTYPE=strtok(NULL,"\n");
+            continue;
+        }
+        if(!strncmp(header_line,"NMEMB",5)){
+            strtok(header_line,":");
+            NMEMB=atoi(strtok(NULL,"\n"));
+            continue;
+        }
+        if(!strncmp(header_line,"NFILE",5)){
+            strtok(header_line,":");
+            NFILE=atoi(strtok(NULL,"\n"));
+
+            datafile=(char**)malloc(NFILE*sizeof(char*));
+            for (int i = 0; i < NFILE; i++) {
+                *(datafile+i) = (char*) malloc((6+1) * sizeof(char));
+            }
+            LPF=(int*)malloc(NFILE);
+            continue;
+        }
+        strcpy(*(datafile+fn),strtok(header_line,":"));
+        *(LPF+fn)=atoi(strtok(NULL,":"));fn++;
+    }
+    fclose(input);free(file);
+
+    //Read data
+    // *(datafile+i) contains filenames like 000001,00000A as char*
+
+    for(int i=0;i<NFILE;i++){
+        file=str_join_on_heap(fulldir,*(datafile+i));printf("%s\n",file);
+        
+    }
+    free(file);
+
+    for (int i = 0; i < NFILE; i++) {free(*(datafile+i));}
+    free(datafile);
+    free(LPF);
+    free(fulldir);
+    exit(1);
+}
+
+
 void load_particles_mpgadget(char *filename, struct particle **p, int64_t *num_p)
 {
 
@@ -129,8 +196,51 @@ void load_particles_mpgadget(char *filename, struct particle **p, int64_t *num_p
     PARTICLE_MASS = Om*CRITICAL_DENSITY * pow(BOX_SIZE, 3) / TOTAL_PARTICLES;
   }
 
-  
+  int64_t to_read = 0;
+  TOTAL_PARTICLES = 0;
+  for (int64_t i=0; i<MPGADGET_NTYPES; i++) {
+    to_read += npart[i];
+    TOTAL_PARTICLES +=(int64_t)npart[i];
+  }
 
+  printf("MPGADGET: snapname:       %s\n", filename);
+  printf("MPGADGET: box size:       %g Mpc/h\n", BOX_SIZE);
+  printf("MPGADGET: h0:             %g\n", h0);
+  printf("MPGADGET: scale factor:   %g\n", SCALE_NOW);
+  printf("MPGADGET: Total Part:     %" PRIu64 "\n", TOTAL_PARTICLES);
+  printf("MPGADGET: ThisFile Part:  %" PRIu64 "\n", to_read);
+  printf("MPGADGET: DM Part Mass:   %g Msun/h\n", PARTICLE_MASS);
+  printf("MPGADGET: avgPartSpacing: %g Mpc/h\n\n", AVG_PARTICLE_SPACING);
+  
+  check_realloc_s(*p, ((*num_p)+to_read), sizeof(struct particle));
+  memset((*p)+(*num_p), 0, sizeof(struct particle)*to_read);
+
+  for (int64_t i=0; i<MPGADGET_NTYPES; i++){
+    // // read IDs, pos, vel    
+    // char buffer[100];
+    // int32_t type = RTYPE_DM;
+    // if (i==0) type = RTYPE_GAS;
+    // else if (i==4) type = RTYPE_STAR;
+    // // else if (i==5) type = RTYPE_BH;
+  
+    // if (!npart[i]) continue;
+    // snprintf(buffer, 100, "PartType%"PRId64, i);
+
+    // continue if no particle type
+    if (!npart[i]){continue;}
+
+    if (i==0){//Gas
+        // for(;(*num_p)<npart[i];(*num_p)++){
+        //     (*(p+(*num_p)))->id;
+        // }
+
+       mpgadget_read_data(filename,0,"ID/");
+    }
+
+
+
+    
+  }
 
 
 
