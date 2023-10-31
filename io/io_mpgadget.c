@@ -110,15 +110,13 @@ void mpgadget_read_snap_header(char *filename,float *massTable, int64_t *npart, 
     free(fullpath);
 }
 
-void mpgadget_read_field_header(char* filename, char* field_dir, char* DTYPE, int* NMEMB, int* NFILE, int** LPF, char*** DFN){
-    char* dir=str_join_on_heap(filename,field_dir);
-    char* file=str_join_on_heap(dir,"header");
-
+void mpgadget_read_field_header(char* fielddir, char* DTYPE, int* NMEMB, int* NFILE, int64_t** LPF, char*** DFN){
+    char* file=str_join_on_heap(fielddir,"header");
     FILE* input;
     char header_line[256];
     char* token;
-    int i=0;
 
+    int i=0;
     input = check_fopen(file,"r");
     while(fgets(header_line, 256, input)){
         token=strtok(header_line,":");
@@ -134,47 +132,10 @@ void mpgadget_read_field_header(char* filename, char* field_dir, char* DTYPE, in
         strcpy(*((*DFN)+i),token);
         *((*LPF)+i)=atoi(strtok(NULL,":"));i++;
     }
-
     fclose(input);
     free(file);
-    free(dir);
 }
 
-void mpgadget_read_field(char *filename, struct particle **p, int64_t *num_p, int part_type,char* field){
-    char DTYPE[4];
-    int NMEMB, NFILE;
-    int* LPF;   // Length Per File
-    char** DFN; // Date File Name
-
-
-
-
-
-    mpgadget_read_field_header(filename,"/0/ID/",&DTYPE,&NMEMB,&NFILE,&LPF,&DFN);
-
-    // printf("DTYPE:%s\nNMEMB: %d\nNFILE: %d\n",DTYPE,NMEMB,NFILE);        // Uncomment these two lines
-    // for(int i=0;i<NFILE;i++){printf("%s: %d\n",*(DFN+i),*(LPF+i));}      // To print field header
-
-
-    char *dir=str_join_on_heap(filename,);
-    char *file;
-    int64_t* ids;
-    // fn=str_join_on_heap(filename,"/0/ID/000003");
-    // ids=(int64_t *)malloc(sizeof(int64_t)*(*(LPF+0)));
-    // FILE* ptr;
-    // ptr=check_fopen(fn,"rb");
-    // fread(ids,sizeof(int64_t),*(LPF+3),ptr);
-    // fclose(ptr);
-    // printf("%ld\n",*(ids+((*(LPF+3))-1)));
-
-    // free(LPF);
-    // for (int i = 0; i < NFILE; i++) {free(*(DFN+i));}
-    // free(DFN);
-
-    // free (ids);
-    // free(fn);
-
-}
 
 void load_particles_mpgadget(char *filename, struct particle **p, int64_t *num_p)
 {
@@ -207,56 +168,99 @@ void load_particles_mpgadget(char *filename, struct particle **p, int64_t *num_p
     printf("MPGADGET: avgPartSpacing: %g Mpc/h\n\n", AVG_PARTICLE_SPACING);
   
     // Check to_read variable method in arepo for if that is more effiecient
-    check_realloc_s(*p, ((*num_p)+TOTAL_PARTICLES), sizeof(struct particle));
+    check_realloc_s(*p, TOTAL_PARTICLES, sizeof(struct particle));
     memset(*p, 0, sizeof(struct particle)*TOTAL_PARTICLES);
 
     *num_p = TOTAL_PARTICLES;
 
-    //------------
-    
-    // mpgadget_read_field(filename,p,num_p);
-
-    // char DTYPE[4];
-    // int NMEMB, NFILE;
-    // int* LPF;   // Length Per File
-    // char** DFN; // Date File Name
 
 
-    char partdir[MPGADGET_NTYPES][4]={"/0/","/1/","/2/","/3/","/4/","5/"};
-    char fielddir[]
+    char DTYPE[4];
+    int NMEMB, NFILE;
+    int64_t* LPF;   // Length Per File
+    char** DFN; // Date File Name
+
+    char partdir[MPGADGET_NTYPES][4]={"/0/","/1/","/2/","/3/","/4/","/5/"};
+    char fielddir[4][16]={"ID/","Mass/","Position/","Velocity/"};
+
+    char *subdir,*fulldir,*file;
+    FILE* ptr;
+    int64_t porigin=0,forigin=0;
+    for (int ptype=0;ptype<MPGADGET_NTYPES;ptype++){
+        if (!npart[ptype]){continue;}   // Dont proceed of zero particle of given type
+        int32_t type = RTYPE_DM;
+        if (ptype==0) type = RTYPE_GAS;
+        else if (ptype==4) type = RTYPE_STAR;
+        else if (ptype==5) type = RTYPE_BH;
+
+        for(int64_t pi=0;pi<npart[ptype];pi++){
+            ((*p)+porigin+pi)->type=type;
+        }
+        
+        for (int ftype=0;ftype<4;ftype++){
+            subdir=str_join_on_heap(partdir[ptype],fielddir[ftype]);
+            fulldir=str_join_on_heap(filename,subdir);
+            // printf("%s\n",fulldir);
+
+            mpgadget_read_field_header(fulldir,&DTYPE,&NMEMB,&NFILE,&LPF,&DFN);
+            // printf("DTYPE:%s\nNMEMB: %d\nNFILE: %d\n",DTYPE,NMEMB,NFILE);        // Uncomment these two lines
+            // for(int i=0;i<NFILE;i++){printf("%s: %d\n",*(DFN+i),*(LPF+i));}      // To print field header
+            
+            forigin=0;
+            for(int nfile=0;nfile<NFILE;nfile++){
+                file=str_join_on_heap(fulldir,*(DFN+nfile));
+                // printf("Reading : %s\n",file);
+                
+                ptr=check_fopen(file,"rb");
+
+                if(ftype==0){
+                    int64_t* buffer=(int64_t *)malloc(sizeof(int64_t)*NMEMB*(*(LPF+nfile)));
+                    fread(buffer,sizeof(int64_t)*NMEMB,*(LPF+nfile),ptr);
+                    for(int64_t bi=0;bi<*(LPF+nfile);bi++){
+                        ((*p)+porigin+forigin+bi)->id=*(buffer+bi);
+                    }
+                    free(buffer);
+                }
+                else{
+                    float* buffer=(float *)malloc(sizeof(float)*NMEMB*(*(LPF+nfile)));
+                    fread(buffer,sizeof(float)*NMEMB,*(LPF+nfile),ptr);
+                    for(int64_t bi=0;bi<*(LPF+nfile);bi++){
+                        if(ftype==1){
+                            ((*p)+porigin+forigin+bi)->mass=*(buffer+bi);continue;
+                        }
+                        if (ftype==2){
+                            ((*p)+porigin+forigin+bi)->pos[0]=*(buffer+bi)*MPGADGET_LENGTH_CONVERSION;bi++;
+                            ((*p)+porigin+forigin+bi)->pos[1]=*(buffer+bi)*MPGADGET_LENGTH_CONVERSION;bi++;
+                            ((*p)+porigin+forigin+bi)->pos[2]=*(buffer+bi)*MPGADGET_LENGTH_CONVERSION;continue;
+                        }
+                        if (ftype==3){
+                            ((*p)+porigin+forigin+bi)->pos[3]=*(buffer+bi);bi++;
+                            ((*p)+porigin+forigin+bi)->pos[4]=*(buffer+bi);bi++;
+                            ((*p)+porigin+forigin+bi)->pos[5]=*(buffer+bi);continue;
+                        }
+                    }
+                    free(buffer);
+                }
+
+                fclose(ptr);
+                free(file);
+                forigin+=*(LPF+nfile);
+            }
+            
+            free(LPF);
+            for (int i = 0; i < NFILE; i++) {free(*(DFN+i));}
+            free(DFN);
+            free(fulldir);
+            free(subdir);
+        }
+        porigin+=npart[ptype];
+    }
+
+
+    // Debug
 
 
 
-
-
-//   for (int64_t i=0; i<MPGADGET_NTYPES; i++){
-//     // // read IDs, pos, vel    
-//     // char buffer[100];
-//     // int32_t type = RTYPE_DM;
-//     // if (i==0) type = RTYPE_GAS;
-//     // else if (i==4) type = RTYPE_STAR;
-//     // // else if (i==5) type = RTYPE_BH;
-//     // snprintf(buffer, 100, "PartType%"PRId64, i);
-
-//     // continue if no particle type
-//     if (!npart[i]){continue;}
-
-
-//     if (i==0){//Gas
-//         char* databuffer;
-//        datampgadget_read_data(filename,0,"ID/",&databuffer);
-
-//         // for(;(*num_p)<npart[i];(*num_p)++){
-//         //     (*(p+(*num_p)))->id;
-//         // }
-
-
-//     }
-    
-//   }
-
-
-
-
-    exit(1);
+    printf("exited\n");
+    // exit(1);
 }
