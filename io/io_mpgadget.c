@@ -40,7 +40,7 @@ char* str_join_on_heap(char *str1,char *str2){
     return joined_string;       // rember to free heap memory
 }
 
-float mpgadget_read_snap_header(char *filename,float *massTable, int64_t *npart, int64_t *npart_init)
+void mpgadget_read_snap_header(char *filename,float *massTable, int64_t *npart, int64_t *npart_init)
 {
     char *subdir="/Header/attr-v2";
     char *fullpath = str_join_on_heap(filename,subdir);
@@ -108,76 +108,36 @@ float mpgadget_read_snap_header(char *filename,float *massTable, int64_t *npart,
 
     fclose(input);
     free(fullpath);
-    return 0;
 }
 
-
-
-void mpgadget_read_data(char* filename,int part_type, char* field){
-    
-    char *particle_dir;
-    if (part_type==0){particle_dir="/0/";}
-    if (part_type==1){particle_dir="/1/";}  
-    if (part_type==2){particle_dir="/2/";}  
-    if (part_type==3){particle_dir="/3/";}  
-    if (part_type==4){particle_dir="/4/";}
-    if (part_type==5){particle_dir="/5/";}
-    char* subdir=str_join_on_heap(particle_dir,field);
-    char *fulldir = str_join_on_heap(filename,subdir);   free(subdir);
-    char *file = str_join_on_heap(fulldir,"header");
+void mpgadget_read_field_header(char* filename, char* field_dir, char* DTYPE, int* NMEMB, int* NFILE, int** LPF, char*** DFN){
+    char* dir=str_join_on_heap(filename,field_dir);
+    char* file=str_join_on_heap(dir,"header");
 
     FILE* input;
-
     char header_line[256];
-    char* DTYPE;
-    int NMEMB, NFILE;
-    char** datafile;
-    int* LPF;   //Length per file for number of particles in each file
-    int fn=0;   //file number for each line of file info in header
+    char* token;
+    int i=0;
 
-    // Read Header
     input = check_fopen(file,"r");
-    while (fgets(header_line, 256, input)){
-        if(!strncmp(header_line,"DTYPE",5)){
-            strtok(header_line,"<");
-            DTYPE=strtok(NULL,"\n");
+    while(fgets(header_line, 256, input)){
+        token=strtok(header_line,":");
+        if(!strcmp(token,"DTYPE")){strcpy(DTYPE,strtok(NULL,"\n"));continue;}
+        if(!strcmp(token,"NMEMB")){*NMEMB=atoi(strtok(NULL,"\n"));continue;}
+        if(!strcmp(token,"NFILE")){
+            *NFILE=atoi(strtok(NULL,"\n"));
+            *DFN=(char**)malloc((*NFILE)*sizeof(char*));
+            for (int j = 0; j < *NFILE; j++) {*((*DFN)+j) = (char*) malloc((6+1) * sizeof(char));}
+            *LPF=(int*)malloc(*NFILE);
             continue;
         }
-        if(!strncmp(header_line,"NMEMB",5)){
-            strtok(header_line,":");
-            NMEMB=atoi(strtok(NULL,"\n"));
-            continue;
-        }
-        if(!strncmp(header_line,"NFILE",5)){
-            strtok(header_line,":");
-            NFILE=atoi(strtok(NULL,"\n"));
-
-            datafile=(char**)malloc(NFILE*sizeof(char*));
-            for (int i = 0; i < NFILE; i++) {
-                *(datafile+i) = (char*) malloc((6+1) * sizeof(char));
-            }
-            LPF=(int*)malloc(NFILE);
-            continue;
-        }
-        strcpy(*(datafile+fn),strtok(header_line,":"));
-        *(LPF+fn)=atoi(strtok(NULL,":"));fn++;
+        strcpy(*((*DFN)+i),token);
+        *((*LPF)+i)=atoi(strtok(NULL,":"));i++;
     }
-    fclose(input);free(file);
 
-    //Read data
-    // *(datafile+i) contains filenames like 000001,00000A as char*
-
-    for(int i=0;i<NFILE;i++){
-        file=str_join_on_heap(fulldir,*(datafile+i));printf("%s\n",file);
-        
-    }
+    fclose(input);
     free(file);
-
-    for (int i = 0; i < NFILE; i++) {free(*(datafile+i));}
-    free(datafile);
-    free(LPF);
-    free(fulldir);
-    exit(1);
+    free(dir);
 }
 
 
@@ -215,35 +175,53 @@ void load_particles_mpgadget(char *filename, struct particle **p, int64_t *num_p
   check_realloc_s(*p, ((*num_p)+to_read), sizeof(struct particle));
   memset((*p)+(*num_p), 0, sizeof(struct particle)*to_read);
 
-  for (int64_t i=0; i<MPGADGET_NTYPES; i++){
-    // // read IDs, pos, vel    
-    // char buffer[100];
-    // int32_t type = RTYPE_DM;
-    // if (i==0) type = RTYPE_GAS;
-    // else if (i==4) type = RTYPE_STAR;
-    // // else if (i==5) type = RTYPE_BH;
-  
-    // if (!npart[i]) continue;
-    // snprintf(buffer, 100, "PartType%"PRId64, i);
 
-    // continue if no particle type
-    if (!npart[i]){continue;}
+//---------------------------------------------------------------------------
+    char DTYPE[4];
+    int NMEMB, NFILE;
+    int* LPF;   // Length Per File
+    char** DFN; // Date File Name
 
-    if (i==0){//Gas
-        // for(;(*num_p)<npart[i];(*num_p)++){
-        //     (*(p+(*num_p)))->id;
-        // }
+    mpgadget_read_field_header(filename,"/0/ID/",&DTYPE,&NMEMB,&NFILE,&LPF,&DFN);
 
-       mpgadget_read_data(filename,0,"ID/");
-    }
+    // printf("DTYPE:%s\nNMEMB: %d\nNFILE: %d\n",DTYPE,NMEMB,NFILE);        // Unceomment these two lines
+    // for(int i=0;i<NFILE;i++){printf("%s: %d\n",*(DFN+i),*(LPF+i));}      // To print field header
 
 
 
+    // open individual file and assign
+
+
+//   for (int64_t i=0; i<MPGADGET_NTYPES; i++){
+//     // // read IDs, pos, vel    
+//     // char buffer[100];
+//     // int32_t type = RTYPE_DM;
+//     // if (i==0) type = RTYPE_GAS;
+//     // else if (i==4) type = RTYPE_STAR;
+//     // // else if (i==5) type = RTYPE_BH;
+//     // snprintf(buffer, 100, "PartType%"PRId64, i);
+
+//     // continue if no particle type
+//     if (!npart[i]){continue;}
+
+
+//     if (i==0){//Gas
+//         char* databuffer;
+//        datampgadget_read_data(filename,0,"ID/",&databuffer);
+
+//         // for(;(*num_p)<npart[i];(*num_p)++){
+//         //     (*(p+(*num_p)))->id;
+//         // }
+
+
+//     }
     
-  }
+//   }
 
 
+    free(LPF);
+    for (int i = 0; i < NFILE; i++) {free(*(DFN+i));}
+    free(DFN);
 
-
-  exit(1);
+    exit(1);
 }
