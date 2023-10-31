@@ -140,56 +140,93 @@ void mpgadget_read_field_header(char* filename, char* field_dir, char* DTYPE, in
     free(dir);
 }
 
-
-void load_particles_mpgadget(char *filename, struct particle **p, int64_t *num_p)
-{
-
-  int64_t npart[MPGADGET_NTYPES];
-  int64_t npart_init[MPGADGET_NTYPES];
-  float massTable[MPGADGET_NTYPES];
-
-  mpgadget_read_snap_header(filename,massTable,npart,npart_init);
-  PARTICLE_MASS   = massTable[MPGHPT] * MPGADGET_MASS_CONVERSION;
-  AVG_PARTICLE_SPACING = cbrt(PARTICLE_MASS / (Om*CRITICAL_DENSITY));
-
-  if(RESCALE_PARTICLE_MASS){
-    PARTICLE_MASS = Om*CRITICAL_DENSITY * pow(BOX_SIZE, 3) / TOTAL_PARTICLES;
-  }
-
-  int64_t to_read = 0;
-  TOTAL_PARTICLES = 0;
-  for (int64_t i=0; i<MPGADGET_NTYPES; i++) {
-    to_read += npart[i];
-    TOTAL_PARTICLES +=(int64_t)npart[i];
-  }
-
-  printf("MPGADGET: snapname:       %s\n", filename);
-  printf("MPGADGET: box size:       %g Mpc/h\n", BOX_SIZE);
-  printf("MPGADGET: h0:             %g\n", h0);
-  printf("MPGADGET: scale factor:   %g\n", SCALE_NOW);
-  printf("MPGADGET: Total Part:     %" PRIu64 "\n", TOTAL_PARTICLES);
-  printf("MPGADGET: ThisFile Part:  %" PRIu64 "\n", to_read);
-  printf("MPGADGET: DM Part Mass:   %g Msun/h\n", PARTICLE_MASS);
-  printf("MPGADGET: avgPartSpacing: %g Mpc/h\n\n", AVG_PARTICLE_SPACING);
-  
-  check_realloc_s(*p, ((*num_p)+to_read), sizeof(struct particle));
-  memset((*p)+(*num_p), 0, sizeof(struct particle)*to_read);
-
-
-//---------------------------------------------------------------------------
+void mpgadget_read_field(char *filename, struct particle **p, int64_t *num_p, int part_type,char* field){
     char DTYPE[4];
     int NMEMB, NFILE;
     int* LPF;   // Length Per File
     char** DFN; // Date File Name
 
+
+
+
+
     mpgadget_read_field_header(filename,"/0/ID/",&DTYPE,&NMEMB,&NFILE,&LPF,&DFN);
 
-    // printf("DTYPE:%s\nNMEMB: %d\nNFILE: %d\n",DTYPE,NMEMB,NFILE);        // Unceomment these two lines
+    // printf("DTYPE:%s\nNMEMB: %d\nNFILE: %d\n",DTYPE,NMEMB,NFILE);        // Uncomment these two lines
     // for(int i=0;i<NFILE;i++){printf("%s: %d\n",*(DFN+i),*(LPF+i));}      // To print field header
 
 
+    char *dir=str_join_on_heap(filename,);
+    char *file;
+    int64_t* ids;
+    // fn=str_join_on_heap(filename,"/0/ID/000003");
+    // ids=(int64_t *)malloc(sizeof(int64_t)*(*(LPF+0)));
+    // FILE* ptr;
+    // ptr=check_fopen(fn,"rb");
+    // fread(ids,sizeof(int64_t),*(LPF+3),ptr);
+    // fclose(ptr);
+    // printf("%ld\n",*(ids+((*(LPF+3))-1)));
 
-    // open individual file and assign
+    // free(LPF);
+    // for (int i = 0; i < NFILE; i++) {free(*(DFN+i));}
+    // free(DFN);
+
+    // free (ids);
+    // free(fn);
+
+}
+
+void load_particles_mpgadget(char *filename, struct particle **p, int64_t *num_p)
+{
+
+    int64_t npart[MPGADGET_NTYPES];
+    int64_t npart_init[MPGADGET_NTYPES];
+    float massTable[MPGADGET_NTYPES];
+
+    mpgadget_read_snap_header(filename,massTable,npart,npart_init);
+    PARTICLE_MASS   = massTable[MPGHPT] * MPGADGET_MASS_CONVERSION;
+    AVG_PARTICLE_SPACING = cbrt(PARTICLE_MASS / (Om*CRITICAL_DENSITY));
+
+    if(RESCALE_PARTICLE_MASS){
+        PARTICLE_MASS = Om*CRITICAL_DENSITY * pow(BOX_SIZE, 3) / TOTAL_PARTICLES;
+    }
+
+    TOTAL_PARTICLES = 0;
+    for (int64_t i=0; i<MPGADGET_NTYPES; i++) {
+        TOTAL_PARTICLES +=(int64_t)npart[i];
+    }
+
+    printf("MPGADGET: snapname:       %s\n", filename);
+    printf("MPGADGET: box size:       %g Mpc/h\n", BOX_SIZE);
+    printf("MPGADGET: h0:             %g\n", h0);
+    printf("MPGADGET: Om:             %g\n", Om);
+    printf("MPGADGET: Ol:             %g\n", Ol);
+    printf("MPGADGET: scale factor:   %g\n", SCALE_NOW);
+    printf("MPGADGET: Total Part:     %" PRIu64 "\n", TOTAL_PARTICLES);
+    printf("MPGADGET: DM Part Mass:   %g Msun/h\n", PARTICLE_MASS);
+    printf("MPGADGET: avgPartSpacing: %g Mpc/h\n\n", AVG_PARTICLE_SPACING);
+  
+    // Check to_read variable method in arepo for if that is more effiecient
+    check_realloc_s(*p, ((*num_p)+TOTAL_PARTICLES), sizeof(struct particle));
+    memset(*p, 0, sizeof(struct particle)*TOTAL_PARTICLES);
+
+    *num_p = TOTAL_PARTICLES;
+
+    //------------
+    
+    // mpgadget_read_field(filename,p,num_p);
+
+    // char DTYPE[4];
+    // int NMEMB, NFILE;
+    // int* LPF;   // Length Per File
+    // char** DFN; // Date File Name
+
+
+    char partdir[MPGADGET_NTYPES][4]={"/0/","/1/","/2/","/3/","/4/","5/"};
+    char fielddir[]
+
+
+
 
 
 //   for (int64_t i=0; i<MPGADGET_NTYPES; i++){
@@ -219,9 +256,7 @@ void load_particles_mpgadget(char *filename, struct particle **p, int64_t *num_p
 //   }
 
 
-    free(LPF);
-    for (int i = 0; i < NFILE; i++) {free(*(DFN+i));}
-    free(DFN);
+
 
     exit(1);
 }
