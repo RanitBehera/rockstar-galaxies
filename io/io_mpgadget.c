@@ -223,7 +223,7 @@ void load_particles_mpgadget(char *filename, struct particle **p, int64_t *num_p
                     float* buffer=(float *)malloc(sizeof(float)*NMEMB*(*(LPF+nfile)));
                     fread(buffer,sizeof(float),NMEMB*(*(LPF+nfile)),ptr);
                     for(int64_t bi=0;bi<NMEMB*(*(LPF+nfile));bi++){
-                        ((*p)+porigin+forigin+(bi/NMEMB))->mass=*(buffer+bi+(bi%NMEMB));
+                        ((*p)+porigin+forigin+(bi/NMEMB))->mass=(*(buffer+bi))*MPGADGET_MASS_CONVERSION;
                     }free(buffer);
                 }else if(ftype==2){//Position
                     double* buffer=(double *)malloc(sizeof(double)*NMEMB*(*(LPF+nfile)));
@@ -255,25 +255,25 @@ void load_particles_mpgadget(char *filename, struct particle **p, int64_t *num_p
 
 
     // Debug
-    int64_t di;
-    printf("Debug Index :");
-    scanf("%ld",&di);
+    // int64_t di;
+    // printf("Debug Index :");
+    // scanf("%ld",&di);
 
-    while(di>-1){
-        printf("Particle List Index: %ld\n",di);
-        printf("ID: %ld\n",((*p)+di)->id);
-        printf("type: %d\n",((*p)+di)->type);
-        printf("mass: %f\n",((*p)+di)->mass);
-        printf("pos[0]: %lf\n",((*p)+di)->pos[0]);
-        printf("pos[1]: %lf\n",((*p)+di)->pos[1]);
-        printf("pos[2]: %lf\n",((*p)+di)->pos[2]);
-        printf("pos[3]: %f\n",((*p)+di)->pos[3]);
-        printf("pos[4]: %f\n",((*p)+di)->pos[4]);
-        printf("pos[5]: %f\n",((*p)+di)->pos[5]);
+    // while(di>-1){
+    //     printf("Particle List Index: %ld\n",di);
+    //     printf("ID: %ld\n",((*p)+di)->id);
+    //     printf("type: %d\n",((*p)+di)->type);
+    //     printf("mass: %f\n",((*p)+di)->mass);
+    //     printf("pos[0]: %lf\n",((*p)+di)->pos[0]);
+    //     printf("pos[1]: %lf\n",((*p)+di)->pos[1]);
+    //     printf("pos[2]: %lf\n",((*p)+di)->pos[2]);
+    //     printf("pos[3]: %f\n",((*p)+di)->pos[3]);
+    //     printf("pos[4]: %f\n",((*p)+di)->pos[4]);
+    //     printf("pos[5]: %f\n",((*p)+di)->pos[5]);
 
-        printf("Debug Index : ");
-        scanf("%ld",&di);
-    }
+    //     printf("Debug Index : ");
+    //     scanf("%ld",&di);
+    // }
 
 
     printf("exited\n");
