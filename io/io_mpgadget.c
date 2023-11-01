@@ -213,38 +213,30 @@ void load_particles_mpgadget(char *filename, struct particle **p, int64_t *num_p
                 
                 ptr=check_fopen(file,"rb");
 
-                if(ftype==0){
+                if(ftype==0){//ID
                     int64_t* buffer=(int64_t *)malloc(sizeof(int64_t)*NMEMB*(*(LPF+nfile)));
                     fread(buffer,sizeof(int64_t),NMEMB*(*(LPF+nfile)),ptr);
                     for(int64_t bi=0;bi<NMEMB*(*(LPF+nfile));bi++){
                         ((*p)+porigin+forigin+(bi/NMEMB))->id=*(buffer+bi+(bi%NMEMB));
-                    }
-                    free(buffer);
-                }else if (ftype==1){
+                    }free(buffer);
+                }else if (ftype==1){//Mass
                     float* buffer=(float *)malloc(sizeof(float)*NMEMB*(*(LPF+nfile)));
                     fread(buffer,sizeof(float),NMEMB*(*(LPF+nfile)),ptr);
                     for(int64_t bi=0;bi<NMEMB*(*(LPF+nfile));bi++){
                         ((*p)+porigin+forigin+(bi/NMEMB))->mass=*(buffer+bi+(bi%NMEMB));
-                    }
-                    free(buffer);
-                }else if(ftype==2){
+                    }free(buffer);
+                }else if(ftype==2){//Position
                     double* buffer=(double *)malloc(sizeof(double)*NMEMB*(*(LPF+nfile)));
                     fread(buffer,sizeof(double),NMEMB*(*(LPF+nfile)),ptr);
                     for(int64_t bi=0;bi<NMEMB*(*(LPF+nfile));bi++){
-                        ((*p)+porigin+forigin+(bi/NMEMB))->pos[0]=*(buffer+bi+(bi%NMEMB))*MPGADGET_LENGTH_CONVERSION;
-                        ((*p)+porigin+forigin+(bi/NMEMB))->pos[1]=*(buffer+bi+(bi%NMEMB))*MPGADGET_LENGTH_CONVERSION;
-                        ((*p)+porigin+forigin+(bi/NMEMB))->pos[2]=*(buffer+bi+(bi%NMEMB))*MPGADGET_LENGTH_CONVERSION;
-                    }
-                    free(buffer);
-                }else if(ftype==3){
+                        ((*p)+porigin+forigin+(bi/NMEMB))->pos[(bi%NMEMB)]=*(buffer+bi)*MPGADGET_LENGTH_CONVERSION;
+                    }free(buffer);
+                }else if(ftype==3){//Velocity
                     float* buffer=(float *)malloc(sizeof(float)*NMEMB*(*(LPF+nfile)));
                     fread(buffer,sizeof(float),NMEMB*(*(LPF+nfile)),ptr);
                     for(int64_t bi=0;bi<NMEMB*(*(LPF+nfile));bi++){
-                        ((*p)+porigin+forigin+(bi/NMEMB))->pos[3]=*(buffer+bi+(bi%NMEMB))*MPGADGET_VELOCITY_CONVERSION;
-                        ((*p)+porigin+forigin+(bi/NMEMB))->pos[4]=*(buffer+bi+(bi%NMEMB))*MPGADGET_VELOCITY_CONVERSION;
-                        ((*p)+porigin+forigin+(bi/NMEMB))->pos[5]=*(buffer+bi+(bi%NMEMB))*MPGADGET_VELOCITY_CONVERSION;
-                    }
-                    free(buffer);
+                        ((*p)+porigin+forigin+(bi/NMEMB))->pos[3+(bi%NMEMB)]=*(buffer+bi)*MPGADGET_VELOCITY_CONVERSION;
+                    }free(buffer);
                 }
 
                 fclose(ptr);
@@ -272,9 +264,9 @@ void load_particles_mpgadget(char *filename, struct particle **p, int64_t *num_p
         printf("ID: %ld\n",((*p)+di)->id);
         printf("type: %d\n",((*p)+di)->type);
         printf("mass: %f\n",((*p)+di)->mass);
-        printf("pos[0]: %f\n",((*p)+di)->pos[0]);
-        printf("pos[1]: %f\n",((*p)+di)->pos[1]);
-        printf("pos[2]: %f\n",((*p)+di)->pos[2]);
+        printf("pos[0]: %lf\n",((*p)+di)->pos[0]);
+        printf("pos[1]: %lf\n",((*p)+di)->pos[1]);
+        printf("pos[2]: %lf\n",((*p)+di)->pos[2]);
         printf("pos[3]: %f\n",((*p)+di)->pos[3]);
         printf("pos[4]: %f\n",((*p)+di)->pos[4]);
         printf("pos[5]: %f\n",((*p)+di)->pos[5]);
@@ -285,5 +277,5 @@ void load_particles_mpgadget(char *filename, struct particle **p, int64_t *num_p
 
 
     printf("exited\n");
-    exit(1);
+    // exit(1);
 }
