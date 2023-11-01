@@ -309,7 +309,7 @@ void print_child_particles(FILE *output, int64_t i, int64_t pid, int64_t eid){
   // So the original implemnetation is comented above for this
   // In this module we only output the following
   // Halo Mass (%f), n_dm (%"PRId64"), n_gas (%"PRId64"), n_star (%"PRId64"), n_bh(%"PRId64"), eid(%"PRId64")
-  fprintf(output,"#HaloMass n_dm n_gas n_star n_bh\n"); 
+  if(i==0){fprintf(output,"#HaloMass n_dm n_gas n_star n_bh\n");} 
   int64_t j, child;
   struct particle *p2;
 
