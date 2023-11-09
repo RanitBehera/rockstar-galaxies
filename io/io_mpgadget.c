@@ -29,15 +29,24 @@
 
 // joins to strings and returns the pointer to heap
 char* str_join_on_heap(char *str1,char *str2){
+    if(str1==NULL || str2==NULL){
+        printf("[Error] One of the argument string is NULL while joining string on heap.\n");exit(1);
+    }
+
     int len1 = strlen(str1);
     int len2 = strlen(str2);
     const int total_len = len1 + len2 + 1; //+1 for terminating null char
     char* joined_string = (char*)malloc(total_len);
+    if(joined_string==NULL){
+        printf("[Error] Allocating heap memory for joining string in heap.\n");exit(1);
+    }
     int i,j;
     for (i=0;i<len1;i++){joined_string[i]=str1[i];}     //i=len1 when loop breaks
     for (j=0;j<len2;j++){joined_string[i+j]=str2[j];}   //j=len2 when loop breaks
     joined_string[i+j]='\0';    // terminating null char
+
     return joined_string;       // rember to free heap memory
+    
 }
 
 void mpgadget_read_snap_header(char *filename,float *massTable, int64_t *npart, int64_t *npart_init)
@@ -45,8 +54,8 @@ void mpgadget_read_snap_header(char *filename,float *massTable, int64_t *npart, 
     char *subdir="/Header/attr-v2";
     char *fullpath = str_join_on_heap(filename,subdir);
 
-    FILE* input;
-    char header_line[200];  // Hard coded
+    FILE* input=NULL;
+    char header_line[256];  // Hard coded
 
     input = check_fopen(fullpath,"r");
     while (fgets(header_line, 256, input)){  // fgets
@@ -106,15 +115,15 @@ void mpgadget_read_snap_header(char *filename,float *massTable, int64_t *npart, 
     // printf("\nm0=%d, m1=%d, m2=%d, m3=%d, m4=%d, m5=%d\n", npart[0], npart[1], npart[2], npart[3], npart[4], npart[5]);
     // printf("\nm0=%d, m1=%d, m2=%d, m3=%d, m4=%d, m5=%d\n", npart_init[0], npart_init[1], npart_init[2], npart_init[3], npart_init[4], npart_init[5]);
 
-    fclose(input);
-    free(fullpath);
+    fclose(input);input==NULL;
+    free(fullpath);fullpath=NULL;
 }
 
 void mpgadget_read_field_header(char* fielddir, char* DTYPE, int* NMEMB, int* NFILE, int64_t** LPF, char*** DFN){
     char* file=str_join_on_heap(fielddir,"header");
-    FILE* input;
+    FILE* input=NULL;
     char header_line[256];
-    char* token;
+    char* token=NULL;
 
     int i=0;
     input = check_fopen(file,"r");
@@ -126,14 +135,18 @@ void mpgadget_read_field_header(char* fielddir, char* DTYPE, int* NMEMB, int* NF
             *NFILE=atoi(strtok(NULL,"\n"));
             *DFN=(char**)malloc((*NFILE)*sizeof(char*));
             for (int j = 0; j < *NFILE; j++) {*((*DFN)+j) = (char*) malloc((6+1) * sizeof(char));}
-            *LPF=(int*)malloc(*NFILE);
+            *LPF=(int*)malloc((*NFILE)*sizeof(int64_t));
             continue;
         }
-        strcpy(*((*DFN)+i),token);
-        *((*LPF)+i)=atoi(strtok(NULL,":"));i++;
+
+        if(i<*NFILE){
+            strcpy(*((*DFN)+i),token);
+            *((*LPF)+i)=atoll(strtok(NULL,":"));
+            i++;
+        }
     }
-    fclose(input);
-    free(file);
+    fclose(input);input=NULL;
+    free(file);file=NULL;
 }
 
 
@@ -167,6 +180,7 @@ void load_particles_mpgadget(char *filename, struct particle **p, int64_t *num_p
     printf("MPGADGET: DM Part Mass:   %g Msun/h\n", PARTICLE_MASS);
     printf("MPGADGET: avgPartSpacing: %g Mpc/h\n\n", AVG_PARTICLE_SPACING);
   
+
     // Check to_read variable method in arepo for if that is more effiecient
     check_realloc_s(*p, TOTAL_PARTICLES, sizeof(struct particle));
     memset(*p, 0, sizeof(struct particle)*TOTAL_PARTICLES);
@@ -174,17 +188,18 @@ void load_particles_mpgadget(char *filename, struct particle **p, int64_t *num_p
     *num_p = TOTAL_PARTICLES;
 
 
-
-    char DTYPE[4];
-    int NMEMB, NFILE;
+    char DTYPE[4]="\0";
+    int NMEMB=0, NFILE=0;
     int64_t* LPF;   // Length Per File
-    char** DFN; // Date File Name
+    char** DFN; // Data File Name
+
 
     char partdir[MPGADGET_NTYPES][4]={"/0/","/1/","/2/","/3/","/4/","/5/"};
     char fielddir[4][16]={"ID/","Mass/","Position/","Velocity/"};
 
     char *subdir,*fulldir,*file;
     FILE* ptr;
+
     int64_t porigin=0,forigin=0;
     for (int ptype=0;ptype<MPGADGET_NTYPES;ptype++){
         if (!npart[ptype]){continue;}   // Dont proceed of zero particle of given type
@@ -202,10 +217,12 @@ void load_particles_mpgadget(char *filename, struct particle **p, int64_t *num_p
             fulldir=str_join_on_heap(filename,subdir);
             // printf("%s\n",fulldir);
 
+
             mpgadget_read_field_header(fulldir,&DTYPE,&NMEMB,&NFILE,&LPF,&DFN);
             // printf("DTYPE:%s\nNMEMB: %d\nNFILE: %d\n",DTYPE,NMEMB,NFILE);        // Uncomment these two lines
             // for(int i=0;i<NFILE;i++){printf("%s: %d\n",*(DFN+i),*(LPF+i));}      // To print field header
             
+
             forigin=0;
             for(int nfile=0;nfile<NFILE;nfile++){
                 file=str_join_on_heap(fulldir,*(DFN+nfile));
@@ -213,48 +230,58 @@ void load_particles_mpgadget(char *filename, struct particle **p, int64_t *num_p
                 
                 ptr=check_fopen(file,"rb");
 
+
                 if(ftype==0){//ID
+
                     int64_t* buffer=(int64_t *)malloc(sizeof(int64_t)*NMEMB*(*(LPF+nfile)));
+
                     fread(buffer,sizeof(int64_t),NMEMB*(*(LPF+nfile)),ptr);
                     for(int64_t bi=0;bi<NMEMB*(*(LPF+nfile));bi++){
                         ((*p)+porigin+forigin+(bi/NMEMB))->id=*(buffer+bi+(bi%NMEMB));
-                    }free(buffer);
+                    }
+                    free(buffer);
                 }else if (ftype==1){//Mass
                     float* buffer=(float *)malloc(sizeof(float)*NMEMB*(*(LPF+nfile)));
                     fread(buffer,sizeof(float),NMEMB*(*(LPF+nfile)),ptr);
                     for(int64_t bi=0;bi<NMEMB*(*(LPF+nfile));bi++){
                         ((*p)+porigin+forigin+(bi/NMEMB))->mass=(*(buffer+bi))*MPGADGET_MASS_CONVERSION;
-                    }free(buffer);
+                    }
+                    free(buffer);
                 }else if(ftype==2){//Position
                     double* buffer=(double *)malloc(sizeof(double)*NMEMB*(*(LPF+nfile)));
                     fread(buffer,sizeof(double),NMEMB*(*(LPF+nfile)),ptr);
                     for(int64_t bi=0;bi<NMEMB*(*(LPF+nfile));bi++){
                         ((*p)+porigin+forigin+(bi/NMEMB))->pos[(bi%NMEMB)]=*(buffer+bi)*MPGADGET_LENGTH_CONVERSION;
-                    }free(buffer);
+                    }
+                    free(buffer);
                 }else if(ftype==3){//Velocity
                     float* buffer=(float *)malloc(sizeof(float)*NMEMB*(*(LPF+nfile)));
                     fread(buffer,sizeof(float),NMEMB*(*(LPF+nfile)),ptr);
                     for(int64_t bi=0;bi<NMEMB*(*(LPF+nfile));bi++){
                         ((*p)+porigin+forigin+(bi/NMEMB))->pos[3+(bi%NMEMB)]=*(buffer+bi)*MPGADGET_VELOCITY_CONVERSION;
-                    }free(buffer);
+                    }
+                    free(buffer);
                 }
 
                 fclose(ptr);
                 free(file);
                 forigin+=*(LPF+nfile);
             }
+
             
-            free(LPF);
-            for (int i = 0; i < NFILE; i++) {free(*(DFN+i));}
-            free(DFN);
-            free(fulldir);
-            free(subdir);
+            free(LPF);LPF=NULL;   //from mpgadget_read_field_header()
+            for (int i = 0; i < NFILE; i++) {free(*(DFN+i));*(DFN+i)=NULL;}
+            free(DFN);DFN=NULL;   //from mpgadget_read_field_header()
+            DTYPE[0]='\0';
+            NMEMB=0;NFILE=0;
+
+            free(fulldir);fulldir=NULL;
+            free(subdir);subdir=NULL;
         }
         porigin+=npart[ptype];
     }
 
-
-    // Debug
+    // ================================================   Debug
     // int64_t di;
     // printf("Debug Index :");
     // scanf("%ld",&di);
