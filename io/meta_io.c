@@ -289,46 +289,46 @@ void output_ascii(int64_t id_offset, int64_t snap, int64_t chunk, float *bounds)
   fclose(output);
 }
 
-// void print_child_particles(FILE *output, int64_t i, int64_t pid, int64_t eid) {
-//   int64_t j, child;
-//   struct particle *p2;
-//   for (j=0; j<halos[i].num_p; j++) {
-//     p2 = p + halos[i].p_start + j;
-//     fprintf(output, "%.7e %.7e %.7e %.7e %.7e %.7e %e %f %"PRId64" %"PRId32" %"PRId64" %"PRId64" %"PRId64"\n", p2->pos[0], p2->pos[1], p2->pos[2], p2->pos[3], p2->pos[4], p2->pos[5], p2->mass, p2->energy, p2->id, p2->type, i, pid, eid);
-//   }
-//   child = extra_info[i].child;
-//   while (child > -1) {
-//     print_child_particles(output, child, pid, eid);
-//     child = extra_info[child].next_cochild;
-//   }
-// }
-
-void print_child_particles(FILE *output, int64_t i, int64_t pid, int64_t eid){
-  // This module is called when particle output is set on.
-  // The original implementtion which lists all fields for all particles is not necessary for interest
-  // So the original implemnetation is comented above for this
-  // In this module we only output the following
-  // Halo Mass (%f), n_dm (%"PRId64"), n_gas (%"PRId64"), n_star (%"PRId64"), n_bh(%"PRId64"), eid(%"PRId64")
-  if(i==0){fprintf(output,"#HaloMass n_dm n_gas n_star n_bh\n");} 
+void print_child_particles(FILE *output, int64_t i, int64_t pid, int64_t eid) {
   int64_t j, child;
   struct particle *p2;
-
-  int64_t n_dm=0,n_gas=0,n_star=0, n_bh=0;
   for (j=0; j<halos[i].num_p; j++) {
     p2 = p + halos[i].p_start + j;
-    if(p2->type==0){n_dm++;}
-    if(p2->type==1){n_gas++;}
-    if(p2->type==2){n_star++;}
-    if(p2->type==3){n_bh++;}
+    fprintf(output, "%.7e %.7e %.7e %.7e %.7e %.7e %e %f %"PRId64" %"PRId32" %"PRId64" %"PRId64" %"PRId64"\n", p2->pos[0], p2->pos[1], p2->pos[2], p2->pos[3], p2->pos[4], p2->pos[5], p2->mass, p2->energy, p2->id, p2->type, i, pid, eid);
   }
-  fprintf(output, "%f %"PRId64" %"PRId64" %"PRId64" %"PRId64" %"PRId64"\n", halos[i].m,n_dm,n_gas,n_star,n_bh,eid);
-  
   child = extra_info[i].child;
   while (child > -1) {
     print_child_particles(output, child, pid, eid);
     child = extra_info[child].next_cochild;
   }
 }
+
+// void print_child_particles(FILE *output, int64_t i, int64_t pid, int64_t eid){
+//   // This module is called when particle output is set on.
+//   // The original implementtion which lists all fields for all particles is not necessary for interest
+//   // So the original implemnetation is comented above for this
+//   // In this module we only output the following
+//   // Halo Mass (%f), n_dm (%"PRId64"), n_gas (%"PRId64"), n_star (%"PRId64"), n_bh(%"PRId64"), eid(%"PRId64")
+//   if(i==0){fprintf(output,"#HaloMass n_dm n_gas n_star n_bh\n");} 
+//   int64_t j, child;
+//   struct particle *p2;
+
+//   int64_t n_dm=0,n_gas=0,n_star=0, n_bh=0;
+//   for (j=0; j<halos[i].num_p; j++) {
+//     p2 = p + halos[i].p_start + j;
+//     if(p2->type==0){n_dm++;}
+//     if(p2->type==1){n_gas++;}
+//     if(p2->type==2){n_star++;}
+//     if(p2->type==3){n_bh++;}
+//   }
+//   fprintf(output, "%f %"PRId64" %"PRId64" %"PRId64" %"PRId64" %"PRId64"\n", halos[i].m,n_dm,n_gas,n_star,n_bh,eid);
+  
+//   child = extra_info[i].child;
+//   while (child > -1) {
+//     print_child_particles(output, child, pid, eid);
+//     child = extra_info[child].next_cochild;
+//   }
+// }
 
 void output_full_particles(int64_t id_offset, int64_t snap, int64_t chunk, float *bounds) {
   char buffer[1024];
