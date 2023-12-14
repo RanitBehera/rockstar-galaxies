@@ -388,7 +388,7 @@ void print_child_particles(FILE *output, int64_t i, int64_t pid, int64_t eid){
     if(p2->type==3){n_bh_r++;}
   }
   
-  // Exclusive self only
+  // --- Exclusive self only
   // fprintf(output, "%f %"PRId64" %"PRId64" %"PRId64" %"PRId64" %"PRId64"\n", halos[i].m,n_dm,n_gas,n_star,n_bh,eid);
   
   // child = extra_info[i].child;
@@ -396,19 +396,21 @@ void print_child_particles(FILE *output, int64_t i, int64_t pid, int64_t eid){
   //   print_child_particles(output, child, pid, eid);
   //   child = extra_info[child].next_cochild;
   // }
+  // ----------------------
 
 
-  // Inclusive Self (with or withour rvir filter as above logic)
+  // --- Inclusive Self
+  // (with or withour rvir filter as above logic)
   // bh_o - bh own ; bh_p = bh parent, bh_c = bh child, bh_ro = bh root own
-
   child = extra_info[i].child;
   while (child > -1) {
-
     print_child_particles_with_num_return(output, child, pid, eid,&n_dm_r,&n_gas_r,&n_star_r,&n_bh_r, rvir,hcx,hcy,hcz);
     child = extra_info[child].next_cochild;
   }
 
-  fprintf(output, "%f %"PRId64" %"PRId64" %"PRId64" %"PRId64" %"PRId64"\n", halos[i].m,n_dm_r,n_gas_r,n_star_r,n_bh_r,eid);
+  if (eid!=-1){
+    fprintf(output, "%f %"PRId64" %"PRId64" %"PRId64" %"PRId64" %"PRId64"\n", halos[i].m,n_dm_r,n_gas_r,n_star_r,n_bh_r,eid);
+  }
 }
 
 
@@ -425,16 +427,17 @@ void output_full_particles(int64_t id_offset, int64_t snap, int64_t chunk, float
   get_output_filename(buffer, 1024, snap, chunk, "particles");
   output = check_fopen(buffer, "w");
 
-  fprintf(output, "#Halo table:\n");
-  fprintf(output, "#id internal_id num_p m%s mbound_%s r%s vmax rvmax vrms x y z vx vy vz Jx Jy Jz energy spin Type SM Gas BH\n", MASS_DEFINITION, MASS_DEFINITION, MASS_DEFINITION);
-  fprintf(output, "#Particle table:\n");
-  fprintf(output, "#x y z vx vy vz mass specific_energy particle_id type assigned_internal_haloid internal_haloid external_haloid\n");
-  fprintf(output, "#type is one of 0 (DM), 1 (Gas), 2 (Star), or 3 (Black Hole).\n");
+  // Commented by Ranit for clean file output
+  // fprintf(output, "#Halo table:\n");
+  // fprintf(output, "#id internal_id num_p m%s mbound_%s r%s vmax rvmax vrms x y z vx vy vz Jx Jy Jz energy spin Type SM Gas BH\n", MASS_DEFINITION, MASS_DEFINITION, MASS_DEFINITION);
+  // fprintf(output, "#Particle table:\n");
+  // fprintf(output, "#x y z vx vy vz mass specific_energy particle_id type assigned_internal_haloid internal_haloid external_haloid\n");
+  // fprintf(output, "#type is one of 0 (DM), 1 (Gas), 2 (Star), or 3 (Black Hole).\n");
 
-  fprintf(output, "#Notes: As not all halos are printed, some halos may not have external halo ids.  (Hence the need to print internal halo ids).  Each particle is assigned to a unique halo; however, some properties (such as halo bound mass) are calculated including all substructure.  As such, particles belonging to subhalos are included in outputs; to exclude substructure, verify that the internal halo id is the same as the assigned internal halo id.\n");
+  // fprintf(output, "#Notes: As not all halos are printed, some halos may not have external halo ids.  (Hence the need to print internal halo ids).  Each particle is assigned to a unique halo; however, some properties (such as halo bound mass) are calculated including all substructure.  As such, particles belonging to subhalos are included in outputs; to exclude substructure, verify that the internal halo id is the same as the assigned internal halo id.\n");
 
-  print_ascii_header_info(output, bounds, num_p);
-  fprintf(output, "#Halo table begins here:\n");
+  // print_ascii_header_info(output, bounds, num_p);
+  // fprintf(output, "#Halo table begins here:\n");
   
   for (i=0; i<num_halos; i++) {
     th = halos+i;
@@ -443,16 +446,16 @@ void output_full_particles(int64_t id_offset, int64_t snap, int64_t chunk, float
       id++;
     } else { th->id = -1; }
 
-    fprintf(output, "#%"PRId64" %"PRId64" %"PRId64" %.3e %.3e"
-	    " %f %f %f %f %f %f %f %f %f %f %g %g %g %g %g %d %e %e %e %"PRId64"\n", th->id, i,
-	    th->num_p, th->m, th->mgrav, th->r, th->vmax, th->rvmax, th->vrms,
-	    th->pos[0], th->pos[1], th->pos[2], th->pos[3], th->pos[4],
-	    th->pos[5], th->J[0], th->J[1], th->J[2], th->energy, th->spin,
-	    (th->type == RTYPE_DM) ? 0 : 1, th->sm, th->gas, th->bh,
-	    extra_info[i].sub_of);
+    // fprintf(output, "#%"PRId64" %"PRId64" %"PRId64" %.3e %.3e"
+	  //   " %f %f %f %f %f %f %f %f %f %f %g %g %g %g %g %d %e %e %e %"PRId64"\n", th->id, i,
+	  //   th->num_p, th->m, th->mgrav, th->r, th->vmax, th->rvmax, th->vrms,
+	  //   th->pos[0], th->pos[1], th->pos[2], th->pos[3], th->pos[4],
+	  //   th->pos[5], th->J[0], th->J[1], th->J[2], th->energy, th->spin,
+	  //   (th->type == RTYPE_DM) ? 0 : 1, th->sm, th->gas, th->bh,
+	  //   extra_info[i].sub_of);
   }
 
-  fprintf(output, "#Particle table begins here:\n");
+  // fprintf(output, "#Particle table begins here:\n");
   for (i=0; i<num_halos; i++) print_child_particles(output, i, i, halos[i].id);
   fclose(output);
   get_output_filename(buffer, 1024, snap, chunk, "particles");
