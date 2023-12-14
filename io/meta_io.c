@@ -289,6 +289,8 @@ void output_ascii(int64_t id_offset, int64_t snap, int64_t chunk, float *bounds)
   fclose(output);
 }
 
+
+
 // void print_child_particles(FILE *output, int64_t i, int64_t pid, int64_t eid) {
 //   int64_t j, child;
 //   struct particle *p2;
@@ -303,6 +305,54 @@ void output_ascii(int64_t id_offset, int64_t snap, int64_t chunk, float *bounds)
 //   }
 // }
 
+
+
+// Ranit Costume Output Version 2
+
+// Ranit : This function is exact copy of "print_child_particles" modified to return child particle numbers
+void print_child_particles_with_num_return(FILE *output, int64_t i, int64_t pid, int64_t eid, int64_t* n_dm_p, int64_t* n_gas_p, int64_t* n_star_p, int64_t* n_bh_p,float rvir,float hcx,float hcy,float hcz){
+  if(i==0){fprintf(output,"#HaloMass n_dm n_gas n_star n_bh\n");} 
+  int64_t j, child;
+  struct particle *p2;
+
+  // for rvir filter
+  float pcx,pcy,pcz;
+  //
+
+  // Find exclusive own particles
+  int64_t n_dm_o=0,n_gas_o=0,n_star_o=0, n_bh_o=0;
+  for (j=0; j<halos[i].num_p; j++) {
+    p2 = p + halos[i].p_start + j;
+
+    // --- rvir filter
+    pcx=p2->pos[0];
+    pcy=p2->pos[1];
+    pcz=p2->pos[2];
+    if (sqrt((pcx-hcx)*(pcx-hcx) + (pcy-hcy)*(pcy-hcy) + (pcz-hcz)*(pcz-hcz))*1000>rvir){continue;}
+    // ---
+
+    if(p2->type==0){n_dm_o++;}
+    if(p2->type==1){n_gas_o++;}
+    if(p2->type==2){n_star_o++;}
+    if(p2->type==3){n_bh_o++;}
+  }
+
+  // Add contribution from all childs, self acting as parent
+  child = extra_info[i].child;
+  while (child > -1) {
+    print_child_particles_with_num_return(output, child, pid, eid, &n_dm_o, &n_gas_o, &n_star_o, &n_bh_o,rvir,hcx,hcy,hcz);
+    child = extra_info[child].next_cochild;
+  }
+
+  // Add self contribution to parent, self acting as child
+  *n_dm_p+=n_dm_o;
+  *n_gas_p+=n_gas_o;
+  *n_star_p+=n_star_o;
+  *n_bh_p+=n_bh_o; 
+
+}
+
+
 void print_child_particles(FILE *output, int64_t i, int64_t pid, int64_t eid){
   // This module is called when particle output is set on.
   // The original implementtion which lists all fields for all particles is not necessary for interest
@@ -313,22 +363,57 @@ void print_child_particles(FILE *output, int64_t i, int64_t pid, int64_t eid){
   int64_t j, child;
   struct particle *p2;
 
-  int64_t n_dm=0,n_gas=0,n_star=0, n_bh=0;
+  // --- for rvir filter
+  float rvir=halos[i].r;
+  float hcx=halos[i].pos[0];
+  float hcy=halos[i].pos[1];
+  float hcz=halos[i].pos[2];
+  float pcx,pcy,pcz;
+  // ---
+
+  int64_t n_dm_r=0,n_gas_r=0,n_star_r=0, n_bh_r=0;
   for (j=0; j<halos[i].num_p; j++) {
     p2 = p + halos[i].p_start + j;
-    if(p2->type==0){n_dm++;}
-    if(p2->type==1){n_gas++;}
-    if(p2->type==2){n_star++;}
-    if(p2->type==3){n_bh++;}
+
+    // --- rvir filter
+    pcx=p2->pos[0];
+    pcy=p2->pos[1];
+    pcz=p2->pos[2];
+    if (sqrt((pcx-hcx)*(pcx-hcx) + (pcy-hcy)*(pcy-hcy) + (pcz-hcz)*(pcz-hcz))*1000>rvir){continue;}
+    // ---
+
+    if(p2->type==0){n_dm_r++;}
+    if(p2->type==1){n_gas_r++;}
+    if(p2->type==2){n_star_r++;}
+    if(p2->type==3){n_bh_r++;}
   }
-  fprintf(output, "%f %"PRId64" %"PRId64" %"PRId64" %"PRId64" %"PRId64"\n", halos[i].m,n_dm,n_gas,n_star,n_bh,eid);
   
+  // Exclusive self only
+  // fprintf(output, "%f %"PRId64" %"PRId64" %"PRId64" %"PRId64" %"PRId64"\n", halos[i].m,n_dm,n_gas,n_star,n_bh,eid);
+  
+  // child = extra_info[i].child;
+  // while (child > -1) {
+  //   print_child_particles(output, child, pid, eid);
+  //   child = extra_info[child].next_cochild;
+  // }
+
+
+  // Inclusive Self (with or withour rvir filter as above logic)
+  // bh_o - bh own ; bh_p = bh parent, bh_c = bh child, bh_ro = bh root own
+
   child = extra_info[i].child;
   while (child > -1) {
-    print_child_particles(output, child, pid, eid);
+
+    print_child_particles_with_num_return(output, child, pid, eid,&n_dm_r,&n_gas_r,&n_star_r,&n_bh_r, rvir,hcx,hcy,hcz);
     child = extra_info[child].next_cochild;
   }
+
+  fprintf(output, "%f %"PRId64" %"PRId64" %"PRId64" %"PRId64" %"PRId64"\n", halos[i].m,n_dm_r,n_gas_r,n_star_r,n_bh_r,eid);
 }
+
+
+
+
 
 void output_full_particles(int64_t id_offset, int64_t snap, int64_t chunk, float *bounds) {
   char buffer[1024];
