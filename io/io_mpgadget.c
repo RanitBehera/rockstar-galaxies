@@ -263,6 +263,7 @@ void load_particles_mpgadget(char *filename, struct particle **p, int64_t *num_p
                     free(buffer);
                 }
 
+                
                 fclose(ptr);
                 free(file);
                 forigin+=*(LPF+nfile);
@@ -277,11 +278,13 @@ void load_particles_mpgadget(char *filename, struct particle **p, int64_t *num_p
 
             free(fulldir);fulldir=NULL;
             free(subdir);subdir=NULL;
+
         }
         porigin+=npart[ptype];
     }
 
-    // ================================================   Debug
+    
+    // ================================================   Debug 1
     // int64_t di;
     // printf("Debug Index :");
     // scanf("%ld",&di);
@@ -302,5 +305,21 @@ void load_particles_mpgadget(char *filename, struct particle **p, int64_t *num_p
     //     scanf("%ld",&di);
     // }
 
+    // ================================================   Debug 2
+    // int64_t n_dm=0,n_gas=0,n_star=0,n_bh=0;
+    // int32_t detype=0;
+    // for(int64_t i=0;i<*num_p;i++){
+    //     detype=((*p)+i)->type;
+    //     if(detype==0){n_dm++;}
+    //     if(detype==1){n_gas++;}
+    //     if(detype==2){n_star++;}
+    //     if(detype==3){n_bh++;}
+    // }
+
+    // printf("num_p=%ld\nn_dm=%ld\nn_gas=%ld\nn_star=%ld\nn_bh=%ld\n",*num_p,n_dm,n_gas,n_star,n_bh);
+    // // printf("num_p=%ld\n",*num_p);
+    // printf("breakp\n");
+
+    // exit(1);
     // exit(1);
 }

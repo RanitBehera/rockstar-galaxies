@@ -1,0 +1,13 @@
+{
+    "files.associations": {
+        "inttypes.h": "c",
+        "io_arepo.h": "c",
+        "io_util.h": "c",
+        "check_syscalls.h": "c",
+        "io_hdf5.h": "c",
+        "universal_constants.h": "c",
+        "config_vars.h": "c",
+        "config.h": "c",
+        "particle.h": "c"
+    }
+}
