@@ -19,15 +19,18 @@
 // are declared here via ../config.template.h via ../config_vars.h
 // Set default values there for MPGADGET fields
 #include "../config_vars.h"  
-#include "../check_syscalls.h"  // for check_fopen()
-#include "../universal_constants.h"  // for CRITICAL_DENSITY etc
+#include "../check_syscalls.h"          // for check_fopen()
+#include "../universal_constants.h"     // for CRITICAL_DENSITY etc
 
 
-#define MPGADGET_NTYPES 6
-#define MPGHPT MPGADGET_HALO_PARTICLE_TYPE
-#define FILE_NAME_MAX_LENGTH 6
+#define MPGADGET_NTYPES 6                   // Number of particle types: DM,Gas,Star,BH and two unused
+#define MPGHPT MPGADGET_HALO_PARTICLE_TYPE  // Short macro for large flag name
+// #define FILE_NAME_MAX_LENGTH 6
 
-// joins to strings and returns the pointer to heap
+
+// Helper function
+// joins two strings on heap and returns the pointer to heap
+// As concating strings using + is not there in C
 char* str_join_on_heap(char *str1,char *str2){
     if(str1==NULL || str2==NULL){
         printf("[Error] One of the argument string is NULL while joining string on heap.\n");exit(1);
@@ -49,6 +52,9 @@ char* str_join_on_heap(char *str1,char *str2){
     
 }
 
+// Main loading function helper
+// To automatically detect various numbers from snapshot header like cosmology used and number of particles
+// The cosmology given in config file is not used
 void mpgadget_read_snap_header(char *filename,float *massTable, int64_t *npart, int64_t *npart_init)
 {
     char *subdir="/Header/attr-v2";
@@ -119,6 +125,8 @@ void mpgadget_read_snap_header(char *filename,float *massTable, int64_t *npart, 
     free(fullpath);fullpath=NULL;
 }
 
+// Main loading function helper
+// To detect various numbers from field header like number of file chunks to read as NFILE
 void mpgadget_read_field_header(char* fielddir, char* DTYPE, int* NMEMB, int* NFILE, int64_t** LPF, char*** DFN){
     char* file=str_join_on_heap(fielddir,"header");
     FILE* input=NULL;
@@ -150,11 +158,14 @@ void mpgadget_read_field_header(char* fielddir, char* DTYPE, int* NMEMB, int* NF
 }
 
 
+
+// Main loading function
 void load_particles_mpgadget(char *filename, struct particle **p, int64_t *num_p)
 {
 
-    int64_t npart[MPGADGET_NTYPES];
-    int64_t npart_init[MPGADGET_NTYPES];
+    // --- Read Snap Header First -------------------------
+    int64_t npart[MPGADGET_NTYPES];         // npart[0],npart[1] stores number of particles of type Gas,DM etc
+    int64_t npart_init[MPGADGET_NTYPES];    
     float massTable[MPGADGET_NTYPES];
 
     mpgadget_read_snap_header(filename,massTable,npart,npart_init);
@@ -165,11 +176,12 @@ void load_particles_mpgadget(char *filename, struct particle **p, int64_t *num_p
         PARTICLE_MASS = Om*CRITICAL_DENSITY * pow(BOX_SIZE, 3) / TOTAL_PARTICLES;
     }
 
-    TOTAL_PARTICLES = 0;
+    TOTAL_PARTICLES = 0;                    // Total particles in snapshot of all types 
     for (int64_t i=0; i<MPGADGET_NTYPES; i++) {
         TOTAL_PARTICLES +=(int64_t)npart[i];
     }
 
+    // --- Print read details -------------------------------
     printf("MPGADGET: snapname:       %s\n", filename);
     printf("MPGADGET: box size:       %g Mpc/h\n", BOX_SIZE);
     printf("MPGADGET: h0:             %g\n", h0);
@@ -185,24 +197,46 @@ void load_particles_mpgadget(char *filename, struct particle **p, int64_t *num_p
     check_realloc_s(*p, TOTAL_PARTICLES, sizeof(struct particle));
     memset(*p, 0, sizeof(struct particle)*TOTAL_PARTICLES);
 
+    // num_p is outscope variable accessed through function argument
+    // which is just total particle of all types
     *num_p = TOTAL_PARTICLES;
 
-
+    // make variables ready to store header detials
     char DTYPE[4]="\0";
     int NMEMB=0, NFILE=0;
     int64_t* LPF;   // Length Per File
     char** DFN; // Data File Name
 
-
+    // make field names ready to be combined
     char partdir[MPGADGET_NTYPES][4]={"/0/","/1/","/2/","/3/","/4/","/5/"};
-    char fielddir[4][16]={"ID/","Mass/","Position/","Velocity/"};
+    char fielddir[5][32]={"ID/","Mass/","Position/","Velocity/","StarFormationRate/"};   // rember to update ftype condition in for loop
 
+    // helper variables
     char *subdir,*fulldir,*file;
     FILE* ptr;
+
+
+    // loop through all particle types via 'ptype'
+    // for each particle, loop through all fields types via 'ftype'
+    // combine dir names from above array
+    // read header field in the field dir
+    // accordingly read binary files and assign
+    
+    // **p accesed throu argument (outscope) stores properties of all particles 
+    // For effricient access in 'p'
+    // 'porigin' is the index of start of a certain particle type in 'p'
+    // say 0-99 for gas, 100-199 for dm etc 
+    // 'forigin' is the index of start of certain file chunk for each particle  
+    // say 0-24 for file 000000, 75-99 for file 000004
+    // actual numbers will be read from npart and nfile and field header file  
 
     int64_t porigin=0,forigin=0;
     for (int ptype=0;ptype<MPGADGET_NTYPES;ptype++){
         if (!npart[ptype]){continue;}   // Dont proceed of zero particle of given type
+        
+        // ptype is the MPGADGET convention : Gas : 0 ; DM  : 1
+        // type is the Rockstar convenstion : DM  : 0 ; Gas : 1 
+        // these two convention switch DM as GAS
         int32_t type = RTYPE_DM;
         if (ptype==0) type = RTYPE_GAS;
         else if (ptype==4) type = RTYPE_STAR;
@@ -210,13 +244,25 @@ void load_particles_mpgadget(char *filename, struct particle **p, int64_t *num_p
 
         for(int64_t pi=0;pi<npart[ptype];pi++){
             ((*p)+porigin+pi)->type=type;
+
+            // initialise sfr to zero also
+            ((*p)+porigin+pi)->sfr=0;
+
         }
         
-        for (int ftype=0;ftype<4;ftype++){
+        for (int ftype=0;ftype<5;ftype++){      // update max field condition when you add extra fields;  better auto detect it
+            // The field StarFomationRate is not available in every particle type
+            // So it will give error when tried to read header from that field in other particle folders
+            // So it cant be implemeneted below but taken special care
+            // so handle ftype=4 only when ptype=0
+            // we check here and skip ftype=4 (0-based index) if not ptype=0
+            // sfr for other particles is initiualised to zero before, so garbage value will not affect
+            if(ftype==4 && ptype!=0){continue;}
+            
+            
             subdir=str_join_on_heap(partdir[ptype],fielddir[ftype]);
             fulldir=str_join_on_heap(filename,subdir);
             // printf("%s\n",fulldir);
-
 
             mpgadget_read_field_header(fulldir,&DTYPE,&NMEMB,&NFILE,&LPF,&DFN);
             // printf("DTYPE:%s\nNMEMB: %d\nNFILE: %d\n",DTYPE,NMEMB,NFILE);        // Uncomment these two lines
@@ -259,6 +305,20 @@ void load_particles_mpgadget(char *filename, struct particle **p, int64_t *num_p
                     fread(buffer,sizeof(float),NMEMB*(*(LPF+nfile)),ptr);
                     for(int64_t bi=0;bi<NMEMB*(*(LPF+nfile));bi++){
                         ((*p)+porigin+forigin+(bi/NMEMB))->pos[3+(bi%NMEMB)]=*(buffer+bi)*MPGADGET_VELOCITY_CONVERSION;
+                    }
+                    free(buffer);
+                }else if(ftype==4){// SFR
+                    // only for Gases, for all other particles initialised to zero before
+                    // for other particles, the code will not reach hear as it is continued above
+                    // This is beacuse this field is not present in other particles
+                    // and will throw error when tried to read header for other particle types
+                    float* buffer=(float *)malloc(sizeof(float)*NMEMB*(*(LPF+nfile)));
+                    fread(buffer,sizeof(float),NMEMB*(*(LPF+nfile)),ptr);
+                    for(int64_t bi=0;bi<NMEMB*(*(LPF+nfile));bi++){
+                        ((*p)+porigin+forigin+(bi/NMEMB))->sfr=*(buffer+bi+(bi%NMEMB));
+                        // if(((*p)+porigin+forigin+(bi/NMEMB))->sfr != 0){
+                        //     printf("%f",((*p)+porigin+forigin+(bi/NMEMB))->sfr);
+                        // }
                     }
                     free(buffer);
                 }

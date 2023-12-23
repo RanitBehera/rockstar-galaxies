@@ -15,6 +15,7 @@ struct particle {
   float softening; /* Per-particle softening, not currently used. */
   float metallicity; /* Not currently used. */
   int32_t type;
+  float sfr;        /* Added by Ranit for sfr of halo, only to be used for gas particles*/
 };
 
 #endif /*PARTICLE_H*/

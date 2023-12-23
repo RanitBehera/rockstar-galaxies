@@ -310,8 +310,8 @@ void output_ascii(int64_t id_offset, int64_t snap, int64_t chunk, float *bounds)
 // Ranit Costume Output Version 2
 
 // Ranit : This function is exact copy of "print_child_particles" modified to return child particle numbers
-void print_child_particles_with_num_return(FILE *output, int64_t i, int64_t pid, int64_t eid, int64_t* n_dm_p, int64_t* n_gas_p, int64_t* n_star_p, int64_t* n_bh_p,float rvir,float hcx,float hcy,float hcz){
-  if(i==0){fprintf(output,"#HaloMass n_dm n_gas n_star n_bh\n");} 
+void print_child_particles_with_num_return(FILE *output, int64_t i, int64_t pid, int64_t eid, int64_t* n_dm_p, int64_t* n_gas_p, int64_t* n_star_p, int64_t* n_bh_p,float* rh_sfr_p,float rvir,float hcx,float hcy,float hcz){
+  // if(i==0){fprintf(output,"#HaloMass n_dm n_gas n_star n_bh\n");} 
   int64_t j, child;
   struct particle *p2;
 
@@ -321,6 +321,8 @@ void print_child_particles_with_num_return(FILE *output, int64_t i, int64_t pid,
 
   // Find exclusive own particles
   int64_t n_dm_o=0,n_gas_o=0,n_star_o=0, n_bh_o=0;
+  float rh_sfr_o=0; 
+
   for (j=0; j<halos[i].num_p; j++) {
     p2 = p + halos[i].p_start + j;
 
@@ -332,7 +334,11 @@ void print_child_particles_with_num_return(FILE *output, int64_t i, int64_t pid,
     // ---
 
     if(p2->type==0){n_dm_o++;}
-    if(p2->type==1){n_gas_o++;}
+    if(p2->type==1){n_gas_o++;rh_sfr_o+=(p2->sfr);
+      printf("---- Subhalo ----\n");
+      printf("p2->sfr : %f\n",p2->sfr);
+      printf("rh_sfr_o : %f\n\n",rh_sfr_o);
+    }
     if(p2->type==2){n_star_o++;}
     if(p2->type==3){n_bh_o++;}
   }
@@ -340,7 +346,7 @@ void print_child_particles_with_num_return(FILE *output, int64_t i, int64_t pid,
   // Add contribution from all childs, self acting as parent
   child = extra_info[i].child;
   while (child > -1) {
-    print_child_particles_with_num_return(output, child, pid, eid, &n_dm_o, &n_gas_o, &n_star_o, &n_bh_o,rvir,hcx,hcy,hcz);
+    print_child_particles_with_num_return(output, child, pid, eid, &n_dm_o, &n_gas_o, &n_star_o, &n_bh_o, &rh_sfr_o,rvir,hcx,hcy,hcz);
     child = extra_info[child].next_cochild;
   }
 
@@ -348,18 +354,34 @@ void print_child_particles_with_num_return(FILE *output, int64_t i, int64_t pid,
   *n_dm_p+=n_dm_o;
   *n_gas_p+=n_gas_o;
   *n_star_p+=n_star_o;
-  *n_bh_p+=n_bh_o; 
+  *n_bh_p+=n_bh_o;
+  *rh_sfr_p+=rh_sfr_o;
+
+  printf("Returninh to Parent\n");
+  printf("%f - %f\n\n",*rh_sfr_p,rh_sfr_o);
+
+  // Dont print here like original to save for sub halo lines to reduce file size
 
 }
 
 
 void print_child_particles(FILE *output, int64_t i, int64_t pid, int64_t eid){
+  // struct particle *p2;
+  // int64_t j;
+  // for (j=0; j<halos[i].num_p; j++) {
+  //   p2 = p + halos[i].p_start + j;
+  //   if(p2->sfr != 0){printf("%f",p2->sfr);}
+  // }
+  // return;
+
+
+
   // This module is called when particle output is set on.
   // The original implementtion which lists all fields for all particles is not necessary for interest
   // So the original implemnetation is comented above for this
   // In this module we only output the following
   // Halo Mass (%f), n_dm (%"PRId64"), n_gas (%"PRId64"), n_star (%"PRId64"), n_bh(%"PRId64"), eid(%"PRId64")
-  if(i==0){fprintf(output,"#HaloMass n_dm n_gas n_star n_bh\n");} 
+  if(i==0){fprintf(output,"#HaloMass n_dm n_gas n_star n_bh rh_sfr AIHID IHID EHID\n");} 
   int64_t j, child;
   struct particle *p2;
 
@@ -372,6 +394,7 @@ void print_child_particles(FILE *output, int64_t i, int64_t pid, int64_t eid){
   // ---
 
   int64_t n_dm_r=0,n_gas_r=0,n_star_r=0, n_bh_r=0;
+  float rh_sfr=0; // root halo sfr
   for (j=0; j<halos[i].num_p; j++) {
     p2 = p + halos[i].p_start + j;
 
@@ -383,7 +406,11 @@ void print_child_particles(FILE *output, int64_t i, int64_t pid, int64_t eid){
     // ---
 
     if(p2->type==0){n_dm_r++;}
-    if(p2->type==1){n_gas_r++;}
+    if(p2->type==1){n_gas_r++;rh_sfr+=(p2->sfr);
+      printf("---- Roothalo ---- %"PRId64"\n",i);
+      printf("p2->sfr : %f\n",p2->sfr);
+      printf("rh_sfr: %f\n\n",rh_sfr);
+    }
     if(p2->type==2){n_star_r++;}
     if(p2->type==3){n_bh_r++;}
   }
@@ -404,12 +431,14 @@ void print_child_particles(FILE *output, int64_t i, int64_t pid, int64_t eid){
   // bh_o - bh own ; bh_p = bh parent, bh_c = bh child, bh_ro = bh root own
   child = extra_info[i].child;
   while (child > -1) {
-    print_child_particles_with_num_return(output, child, pid, eid,&n_dm_r,&n_gas_r,&n_star_r,&n_bh_r, rvir,hcx,hcy,hcz);
+    print_child_particles_with_num_return(output, child, pid, eid,&n_dm_r,&n_gas_r,&n_star_r,&n_bh_r, &rh_sfr,rvir,hcx,hcy,hcz);
     child = extra_info[child].next_cochild;
   }
 
   if (eid!=-1){
-    fprintf(output, "%f %"PRId64" %"PRId64" %"PRId64" %"PRId64" %"PRId64"\n", halos[i].m,n_dm_r,n_gas_r,n_star_r,n_bh_r,eid);
+    // print only halos unlike original to reduce file size
+    // dont print particles which are not in any top level halo
+    fprintf(output, "%f %"PRId64" %"PRId64" %"PRId64" %"PRId64" %f %"PRId64" %"PRId64" %"PRId64"\n", halos[i].m,n_dm_r,n_gas_r,n_star_r,n_bh_r,rh_sfr,i,pid,eid);
   }
 }
 
